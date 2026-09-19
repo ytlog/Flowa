@@ -1,0 +1,13 @@
+com.flowa.domain.CommandLineTest: tests=2, failures=0, errors=0
+  PASS rejectsUnterminatedQuotes
+  PASS quotedArgumentsAndNegativeDatesStayIntact
+com.flowa.domain.DomainTest: tests=9, failures=0, errors=0
+  PASS pipelineTransformsCopiesThenSavesFinalOutputAndRetainsTags
+  PASS newTypingDuringExecutionIsNotCleared
+  PASS importsPlainMarkdownWithoutFrontMatter
+  PASS emptyHttpWorkflowSendsReturnWithoutSavingEmptyRecord
+  PASS searchRequiresEveryKeywordAndEveryIncludedTag
+  PASS markdownRoundTripPreservesTagsMultilineAndQuotes
+  PASS failureDoesNotConsumeDraftOrCreateRecord
+  PASS validatesHostAndPort
+  PASS invalidWorkflowsFailBeforeAnySideEffect

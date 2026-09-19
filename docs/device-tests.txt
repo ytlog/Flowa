@@ -1,0 +1,8 @@
+
+com.flowa.app.AgentIntegrationTest:....
+com.flowa.app.CaptureUiTest:..
+com.flowa.app.RepositoryTest:...
+
+Time: 11.04
+
+OK (9 tests)
