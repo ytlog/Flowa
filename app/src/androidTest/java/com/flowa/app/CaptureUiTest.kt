@@ -2,11 +2,15 @@ package com.flowa.app
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.test.platform.app.InstrumentationRegistry
+import org.junit.Before
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 class CaptureUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @Before fun requireIsolatedInstall() { assertTrue("UI tests require -PisolatedUiTest=true", InstrumentationRegistry.getInstrumentation().targetContext.packageName.endsWith(".uitest")) }
     @Test fun captureClearRestoreAndNavigation() {
         compose.waitUntil(15000) { compose.onAllNodesWithContentDescription("随心记").fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(hasSetTextAction()).performTextReplacement("Compose regression draft")
@@ -20,12 +24,12 @@ class CaptureUiTest {
         compose.onNodeWithContentDescription("返回").performClick()
         compose.onNodeWithText("Compose regression draft").assertExists()
     }
-    @Test fun blankWorkflowShowsErrorWithoutConsumingDraft() {
+    @Test fun defaultSaveCreatesRecord() {
         compose.waitUntil(15000) { compose.onAllNodesWithContentDescription("随心记").fetchSemanticsNodes().isNotEmpty() }
-        compose.onNode(hasSetTextAction()).performTextReplacement("保留这个草稿")
-        compose.onNodeWithContentDescription("默认工作流").performClick()
-        compose.onNodeWithText("还没有启用的步骤。请添加并启用至少一个步骤，再运行。").assertExists()
-        compose.onNodeWithText("继续记录").performClick()
-        compose.onNodeWithText("保留这个草稿").assertExists()
+        compose.onNode(hasSetTextAction()).performTextReplacement("默认保存回归记录")
+        compose.onNodeWithContentDescription("保存记录").performClick()
+        compose.waitUntil(5000) { compose.onAllNodesWithText("已保存记录").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("记录").performClick()
+        compose.onNodeWithText("默认保存回归记录").assertExists()
     }
 }

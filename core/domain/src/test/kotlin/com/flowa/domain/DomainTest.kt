@@ -6,6 +6,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DomainTest {
+    @Test fun builtInWorkflowsSaveOrCopyAsAdvertised() = runTest {
+        for (flow in DefaultWorkflows.create()) {
+            val repo = FakeRepository(); val device = FakeDevice()
+            RunWorkflow(repo, FakeAi(), device)(flow, repo.state.value.draft) {}
+            when (flow.name) {
+                "保存记录" -> { assertEquals("不能丢失", repo.state.value.notes.single().text); assertTrue(device.copies.isEmpty()) }
+                "整理口述" -> { assertEquals("改写结果", repo.state.value.notes.single().text); assertTrue(device.copies.isEmpty()) }
+                "润色文案" -> { assertTrue(repo.state.value.notes.isEmpty()); assertEquals(listOf("改写结果"), device.copies) }
+            }
+            assertTrue(repo.state.value.draft.text.isEmpty())
+        }
+    }
+
+    @Test fun emptyAiOutputPreservesDraftWithoutSavingOrCopying() = runTest {
+        for (type in listOf(StepType.AI, StepType.AGENT)) {
+            val repo = FakeRepository(); val device = FakeDevice()
+            val ai = object : AiGateway {
+                override suspend fun complete(settings: AiSettings, messages: List<Message>, onDelta: (String) -> Unit) = "  "
+                override suspend fun agent(settings: AiSettings, messages: List<Message>, onDelta: (String) -> Unit, onTool: (String) -> Unit, sessionId: String) = "  "
+                override suspend fun models(settings: AiSettings) = emptyList<String>()
+            }
+            val workflow = Workflow(steps = listOf(Step(type = type, prompt = "整理"), Step(type = StepType.COPY), Step(type = StepType.SAVE)))
+            try { RunWorkflow(repo, ai, device)(workflow, repo.state.value.draft) {}; fail("Empty AI result must fail") } catch (_: IllegalArgumentException) { }
+            assertEquals("不能丢失", repo.state.value.draft.text)
+            assertTrue(repo.state.value.notes.isEmpty()); assertTrue(device.copies.isEmpty())
+        }
+    }
     @Test fun searchRequiresEveryKeywordAndEveryIncludedTag() {
         val note = Note(text = "今天讨论 Compose 动画", tags = listOf("工作", "灵感"))
         assertTrue(NoteFilter("compose 动画", setOf("工作")).matches(note))

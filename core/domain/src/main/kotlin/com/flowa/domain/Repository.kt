@@ -40,6 +40,9 @@ class RunWorkflow(private val repository: AppRepository, private val ai: AiGatew
                 StepType.SAVE -> save = true
                 StepType.HTTP -> device.post(step, text)
             }
+            if (step.type == StepType.AI || step.type == StepType.AGENT) {
+                require(text.isNotBlank()) { "AI 未返回有效文本，草稿已保留，请重试。" }
+            }
         }
         repository.update { state -> state.copy(notes = if (save) listOf(Note(text = text, tags = draft.tags)) + state.notes else state.notes, draft = if (state.draft == draft) Draft(tags = draft.tags) else state.draft) }
         return when { save && copied -> "已保存记录并复制文本"; save -> "已保存记录"; copied -> "已复制文本"; else -> "工作流已完成" }

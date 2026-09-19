@@ -43,6 +43,7 @@ class HttpAiGateway(private val repository: AppRepository, private val deviceToo
         return fetch(request(settings, "/chat/completions", body)) { response ->
             if (response.header("Content-Type")?.contains("event-stream") != true) {
                 val result = JSONObject(response.body!!.string()).getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content")
+                require(result.isNotBlank()) { "AI 未返回有效文本，草稿已保留，请重试。" }
                 onDelta(result); result
             } else {
                 val result = StringBuilder()
@@ -59,7 +60,7 @@ class HttpAiGateway(private val repository: AppRepository, private val deviceToo
                         result.append(delta); if (delta.isNotEmpty()) onDelta(result.toString())
                     }
                 }
-                require(result.isNotBlank()) { "AI 没有返回文本，请检查模型和服务地址。" }; result.toString()
+                require(result.isNotBlank()) { "AI 未返回有效文本，草稿已保留，请重试。" }; result.toString()
             }
         }
     }

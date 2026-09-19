@@ -143,8 +143,8 @@ import kotlinx.coroutines.delay
             })
         }
         if (focused == null && text.text.isEmpty() && state.notes.isEmpty()) Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-            Text("草稿随输入自动保存。添加“保存记录”步骤后，就能在记录列表中回顾。", style = MaterialTheme.typography.bodySmall, color = Secondary)
-            TextButton(onClick = { openSheet("workflows") }, contentPadding = PaddingValues(0.dp)) { Text("添加保存步骤") }
+            Text("草稿随输入自动保存。写完点底部保存图标即可存为记录；整理口述和润色文案需要先配置 AI。", style = MaterialTheme.typography.bodySmall, color = Secondary)
+            TextButton(onClick = { openSheet("workflows") }, contentPadding = PaddingValues(0.dp)) { Text("查看工作流") }
         }
         if (focused == null && (executing != null || status != null)) Text(executing?.let { "正在运行：第 ${it.step} 步" } ?: status.orEmpty(), Modifier.padding(horizontal = 20.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = Secondary)
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 8.dp, top = 8.dp).height(48.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

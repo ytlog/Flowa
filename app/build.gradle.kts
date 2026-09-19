@@ -3,6 +3,7 @@ android {
     namespace = "com.flowa.app"
     compileSdk = 35
     defaultConfig { applicationId = "com.flowa.app"; minSdk = 26; targetSdk = 35; versionCode = 1; versionName = "1.0.0"; testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner" }
+    buildTypes { getByName("debug") { if (providers.gradleProperty("isolatedUiTest").orNull == "true") applicationIdSuffix = ".uitest" } }
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.0" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }

@@ -16,6 +16,21 @@ class RepositoryTest {
         override fun getFilesDir() = File(super.getCacheDir(), "test-$id").apply { mkdirs() }
         override fun getSharedPreferences(name: String, mode: Int) = super.getSharedPreferences("test-$id-$name", mode)
     }
+    @Test fun upgradePreservesUserDataAndDoesNotRecreateDeletedPresets() = runBlocking {
+        val context = isolatedContext(); val old = LocalRepository(context); old.load()
+        val legacy = Workflow(); val custom = Workflow(name = "我的流程", steps = listOf(Step(type = StepType.COPY)))
+        old.update { it.copy(workflows = listOf(legacy, custom), focusedId = legacy.id, draft = Draft("现有草稿"), notes = listOf(Note(text = "现有记录"))) }
+        val file = File(context.filesDir, "library/state.json")
+        val json = org.json.JSONObject(file.readText()); json.remove("defaultWorkflowsVersion"); file.writeText(json.toString())
+        val upgraded = LocalRepository(context); upgraded.load()
+        val state = upgraded.state.value
+        assertEquals(listOf("保存记录", "我的流程", "整理口述", "润色文案"), state.workflows.map { it.name })
+        assertEquals(legacy.id, state.workflows.first().id); assertEquals(legacy.id, state.focusedId)
+        assertEquals(custom, state.workflows[1]); assertEquals("现有草稿", state.draft.text); assertEquals("现有记录", state.notes.single().text)
+        upgraded.update { it.copy(workflows = it.workflows.filterNot { flow -> flow.name == "润色文案" }) }
+        val reloaded = LocalRepository(context); reloaded.load()
+        assertEquals(upgraded.state.value, reloaded.state.value)
+    }
     @Test fun processReloadPreservesDraftAndEncryptedSettings() = runBlocking {
         val context = isolatedContext(); val first = LocalRepository(context); first.load()
         first.update { it.copy(draft = Draft("没有丢失的草稿", listOf("工作")), settings = AiSettings(apiKey = "test-secret")) }

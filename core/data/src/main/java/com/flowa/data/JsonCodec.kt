@@ -23,7 +23,7 @@ internal object JsonCodec {
     fun workflow(j: JSONObject) = Workflow(j.getString("id"), j.getString("name"), j.optString("icon", "branch"), j.optBoolean("isOpen", true), j.array("nodes").objects().map(::step))
     fun settings(a: AiSettings, key: Boolean) = JSONObject().put("apiToken", if (key) a.apiKey else "").put("baseURLString", a.baseUrl).put("modelID", a.model).put("memoryEnabled", a.memoryEnabled)
     fun settings(j: JSONObject) = AiSettings(j.optString("apiToken", ""), j.optString("baseURLString", AiSettings().baseUrl), j.optString("modelID", AiSettings().model), j.optBoolean("memoryEnabled", true))
-    fun encode(s: AppState): JSONObject = JSONObject().put("draft", draft(s.draft)).put("cleared", s.cleared?.let(::draft))
+    fun encode(s: AppState): JSONObject = JSONObject().put("defaultWorkflowsVersion", 1).put("draft", draft(s.draft)).put("cleared", s.cleared?.let(::draft))
         .put("notes", array(s.notes) { JSONObject().put("id", it.id).put("text", it.text).put("tags", strings(it.tags)).put("createdAt", it.createdAt) })
         .put("workflows", array(s.workflows, ::workflow)).put("focusedId", s.focusedId).put("settings", settings(s.settings, false))
         .put("sessions", array(s.sessions) { session -> JSONObject().put("id", session.id).put("title", session.title).put("updatedAt", session.updatedAt).put("messages", array(session.messages) { JSONObject().put("id", it.id).put("role", it.role).put("text", it.text).put("tools", strings(it.tools)) }) })
@@ -31,7 +31,7 @@ internal object JsonCodec {
     fun decode(j: JSONObject, key: String): AppState = AppState(
         notes = j.array("notes").objects().map { Note(it.getString("id"), it.getString("text"), it.array("tags").strings(), it.getLong("createdAt")) },
         draft = draft(j.obj("draft")), cleared = j.optJSONObject("cleared")?.let(::draft),
-        workflows = j.array("workflows").objects().map(::workflow).ifEmpty { listOf(Workflow()) },
+        workflows = j.array("workflows").objects().map(::workflow).let { if (j.optInt("defaultWorkflowsVersion", 0) < 1) DefaultWorkflows.upgrade(it) else it },
         focusedId = j.optString("focusedId").takeUnless { it.isBlank() || it == "null" }, settings = settings(j.obj("settings")).copy(apiKey = key),
         sessions = j.array("sessions").objects().map { session -> ChatSession(session.getString("id"), session.getString("title"), session.array("messages").objects().map { Message(it.getString("id"), it.getString("role"), it.getString("text"), it.array("tools").strings()) }, session.getLong("updatedAt")) },
         memory = j.optString("memory"), skills = j.array("skills").objects().map { Skill(it.getString("name"), it.getString("content"), it.optBoolean("enabled", true)) }, knownTags = j.array("knownTags").strings()

@@ -30,7 +30,7 @@ data class AiSettings(val apiKey: String = "", val baseUrl: String = "https://ap
 data class Message(val id: String = newId(), val role: String, val text: String, val tools: List<String> = emptyList())
 data class ChatSession(val id: String = newId(), val title: String = "新对话", val messages: List<Message> = emptyList(), val updatedAt: Long = System.currentTimeMillis())
 data class Skill(val name: String, val content: String, val enabled: Boolean = true)
-data class AppState(val demoMode: Boolean = false, val notes: List<Note> = emptyList(), val draft: Draft = Draft(), val cleared: Draft? = null, val workflows: List<Workflow> = listOf(Workflow()), val focusedId: String? = null, val settings: AiSettings = AiSettings(), val sessions: List<ChatSession> = emptyList(), val memory: String = "", val skills: List<Skill> = emptyList(), val knownTags: List<String> = emptyList()) {
+data class AppState(val demoMode: Boolean = false, val notes: List<Note> = emptyList(), val draft: Draft = Draft(), val cleared: Draft? = null, val workflows: List<Workflow> = DefaultWorkflows.create(), val focusedId: String? = null, val settings: AiSettings = AiSettings(), val sessions: List<ChatSession> = emptyList(), val memory: String = "", val skills: List<Skill> = emptyList(), val knownTags: List<String> = emptyList()) {
     val tags: List<String> get() = (knownTags + notes.flatMap { it.tags } + draft.tags).distinct().sorted()
 }
 data class NoteFilter(val query: String = "", val included: Set<String> = emptySet(), val excluded: Set<String> = emptySet(), val untagged: Boolean = false, val date: LocalDate? = null) {

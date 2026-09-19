@@ -1,0 +1,10 @@
+com.flowa.app.DefaultWorkflowUiTest:........
+com.flowa.app.RepositoryTest:....
+com.flowa.app.AgentIntegrationTest:....
+
+Time: 32.671
+
+OK (16 tests)
+
+com.flowa.domain.CommandLineTest: 2 tests, 0 failures, 0 errors
+com.flowa.domain.DomainTest: 11 tests, 0 failures, 0 errors

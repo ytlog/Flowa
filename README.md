@@ -9,11 +9,13 @@
 ```sh
 ./gradlew :app:assembleDebug
 ./gradlew :core:domain:test
-./gradlew :app:connectedDebugAndroidTest
+./gradlew :app:connectedDebugAndroidTest -PisolatedUiTest=true
 ./gradlew :app:lintDebug
 ```
 
-APK：`app/build/outputs/apk/debug/app-debug.apk`。不配置 AI 也可以记录、搜索、导入导出以及使用保存、复制工作流。首次启动保留原版空工作流：点“添加保存步骤”→默认工作流→添加步骤→保存记录→保存步骤。
+UI 自动化使用 `-PisolatedUiTest=true` 安装独立包 `com.flowa.app.uitest`，避免测试操作影响日常笔记。测试完成后，不带此参数重新构建正式调试 APK。
+
+APK：`app/build/outputs/apk/debug/app-debug.apk`。不配置 AI 也可以记录、搜索、导入导出以及使用保存、复制工作流。默认提供三个工作流：保存记录（直接保存）、整理口述（AI 整理后保存）、润色文案（AI 润色后复制）。后两个需要先在设置中配置 AI。升级旧版本时替换原始空工作流并补齐预设，保留自定义工作流、记录和草稿；之后删除的预设不会重新出现。
 
 ## 分层
 
