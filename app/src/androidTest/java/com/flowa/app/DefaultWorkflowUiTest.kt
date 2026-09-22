@@ -63,6 +63,14 @@ class DefaultWorkflowUiTest {
             throw AssertionError("Expected: $text; draft=${app.repository.state.value.draft}; notes=${app.repository.state.value.notes}; UI=${compose.onAllNodes(isRoot()).let { roots -> roots.fetchSemanticsNodes().indices.joinToString { roots[it].printToString() } }}", failure)
         }
     }
+    private fun awaitWindowFocus() {
+        compose.waitUntil(10000) {
+            var focused = false
+            scenario!!.onActivity { focused = it.hasWindowFocus() }
+            focused
+        }
+    }
+
     private fun persisted(): AppState = runBlocking { LocalRepository(app).also { it.load() }.state.value }
     private fun settings(server: WorkflowTestServer) = AiSettings("local-test-key", server.url, "test-model")
 
@@ -73,7 +81,8 @@ class DefaultWorkflowUiTest {
         val state = persisted()
         assertEquals("中文记录：今天完成默认工作流测试。", state.notes.single().text)
         assertEquals(listOf("回归测试"), state.notes.single().tags)
-        assertEquals(Draft(tags = listOf("回归测试")), state.draft)
+        assertEquals("", state.draft.text)
+        assertEquals(listOf("回归测试"), state.draft.tags)
         scenario!!.recreate()
         compose.onNodeWithContentDescription("记录").performClick()
         awaitText(state.notes.single().text)
@@ -118,11 +127,13 @@ class DefaultWorkflowUiTest {
         WorkflowTestServer("期待与你分享新的灵感。").use { server ->
             launch(AppState(settings = settings(server)))
             val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            awaitWindowFocus()
             val previous = compose.runOnIdle { clipboard.primaryClip }
             try {
                 type("有个新的想法，想分享一下。")
                 run("润色文案"); awaitText("已复制文本")
-                compose.runOnIdle { assertEquals("期待与你分享新的灵感。", clipboard.primaryClip!!.getItemAt(0).text.toString()) }
+                awaitWindowFocus()
+                compose.runOnIdle { assertEquals("期待与你分享新的灵感。", clipboard.primaryClip?.getItemAt(0)?.text?.toString()) }
                 assertTrue(persisted().notes.isEmpty()); assertTrue(persisted().draft.text.isEmpty())
             } finally {
                 compose.runOnIdle { if (previous != null) clipboard.setPrimaryClip(previous) else if (android.os.Build.VERSION.SDK_INT >= 28) clipboard.clearPrimaryClip() else clipboard.setPrimaryClip(android.content.ClipData.newPlainText("", "")) }
@@ -151,6 +162,53 @@ class DefaultWorkflowUiTest {
             compose.onNodeWithText("下一条正在输入").assertExists()
             assertEquals("下一条正在输入", persisted().draft.text)
             assertEquals("第一条整理结果", persisted().notes.single().text)
+        }
+    }
+
+    @Test fun editingBackToOriginalDoesNotLetOldWorkflowClearIt() {
+        WorkflowTestServer("旧任务的整理结果", delayed = true).use { server ->
+            launch(AppState(settings = settings(server))); type("同样的原文")
+            run("整理口述"); compose.waitUntil(10000) { server.request.get() != null }
+            type("中途改成其他内容"); type("同样的原文")
+            compose.waitUntil(5000) { app.repository.state.value.draft.revision >= 3 }
+            server.release.countDown(); awaitText("已保存记录")
+            compose.onNodeWithText("同样的原文").assertExists()
+            assertEquals("同样的原文", persisted().draft.text)
+            assertEquals("旧任务的整理结果", persisted().notes.single().text)
+        }
+    }
+
+    @Test fun changingEnvironmentCancelsPendingWorkflow() {
+        WorkflowTestServer("不能写进演示数据的结果", delayed = true).use { server ->
+            launch(AppState(settings = settings(server))); type("真实环境草稿")
+            run("整理口述"); compose.waitUntil(10000) { server.request.get() != null }
+            scenario!!.onActivity { androidx.lifecycle.ViewModelProvider(it)[com.flowa.app.presentation.AppViewModel::class.java].setDemo(true) }
+            compose.waitUntil(10000) { app.repository.state.value.demoMode }
+            server.release.countDown()
+            assertFalse(persisted().notes.any { it.text == "不能写进演示数据的结果" })
+            scenario!!.onActivity { androidx.lifecycle.ViewModelProvider(it)[com.flowa.app.presentation.AppViewModel::class.java].setDemo(false) }
+            compose.waitUntil(10000) { !app.repository.state.value.demoMode }
+            awaitText("真实环境草稿")
+            assertTrue(persisted().notes.isEmpty())
+        }
+    }
+
+    @Test fun chatWriteFailureKeepsInputAndReleasesBusyState() {
+        launch(AppState(settings = AiSettings(apiKey = "local-test-key")))
+        click("更多操作")
+        compose.onNodeWithText("AI 助手").performClick()
+        type("发送失败时保留这条消息")
+        val root = java.io.File(app.filesDir, "library")
+        val backup = java.io.File(app.filesDir, "library-test-backup")
+        assertTrue(root.renameTo(backup)); assertTrue(root.createNewFile())
+        try {
+            click("发送消息"); awaitText("操作未完成")
+            compose.onNodeWithText("继续记录").performClick()
+            compose.onNode(hasSetTextAction()).assertTextEquals("发送失败时保留这条消息")
+            compose.onNodeWithContentDescription("发送消息").assertExists()
+            assertTrue(app.repository.state.value.sessions.isEmpty())
+        } finally {
+            assertTrue(root.delete()); assertTrue(backup.renameTo(root))
         }
     }
 

@@ -1,6 +1,23 @@
 # 随心记 · Flowa Android
 
-参考 `vibetaking/apps/ios` 源码实现的 Android 客户端。界面使用 Jetpack Compose，保留“打开即写”、原宋体字标、黑白控件、靛蓝标签、工作流胶囊和专注模式。
+打开即写的纯文本速记工具，参考 [vibetaking](https://github.com/ddhjy/vibetaking) 的 `apps/ios` 源码实现的 Android 客户端。界面使用 Jetpack Compose，保留原宋体字标、黑白控件、靛蓝标签、工作流胶囊和专注模式。
+
+启动直达空白编辑页：自动聚焦、键盘就绪、草稿实时落盘，记录以 Markdown 导入导出。Android 无法访问原应用的 iCloud 私有容器，本版使用本机持久化。
+
+## 设计理念
+
+多数笔记产品打开先看列表，以回顾为中心。随心记把入口放回记录本身：一张空白页，一个就绪的光标。空白减少选择和干扰，也自然产生把它填上的动机。
+
+这种快来自几处取舍：
+
+- **入口快**：主页即编辑页，无需新建、选分类或找笔记。
+- **启动快**：原生组件构建，优先保证启动和交互响应。
+- **输入快**：纯文本，不区分标题正文，不提供复杂排版。
+- **整理快**：只有记录和标签两层；标签积累后，零散文本可分类、可检索、可回顾。
+
+需要更快输入时，配合系统听写或语音转文字工具即可。
+
+参考：[vibetaking](https://github.com/ddhjy/vibetaking) · [App Store](https://apps.apple.com/cn/app/id6778762693)
 
 ## 运行
 
@@ -8,7 +25,7 @@
 
 ```sh
 ./gradlew :app:assembleDebug
-./gradlew :core:domain:test
+./gradlew :core:domain:test :app:testDebugUnitTest
 ./gradlew :app:connectedDebugAndroidTest -PisolatedUiTest=true
 ./gradlew :app:lintDebug
 ```
@@ -20,8 +37,8 @@ APK：`app/build/outputs/apk/debug/app-debug.apk`。不配置 AI 也可以记录
 ## 分层
 
 - `core/domain`：纯 Kotlin 模型、仓库/服务接口、搜索规则、Markdown 编解码、工作流执行用例。没有 Android 和 Compose 依赖。
-- `core/data`：原子文件存储、Android Keystore、iOS 配置兼容、ZIP 导入导出、HTTP/SSE、Agent 工具循环、局域网发现和设备授权。
-- `app/presentation`：ViewModel、单向状态流、顺序写入队列、异步任务和错误反馈。
+- `core/data`：仓库协调状态；`SnapshotStore` 原子存储、`SnapshotMigrations` 升级旧快照、`NoteArchive` 导入导出笔记、`ConfigurationCodec` 兼容 iOS 配置。平台接口实现网络、Keystore、局域网发现与设备授权。
+- `app/presentation`：ViewModel 统一持有编辑器状态；`StateWriter` 顺序保存并传递失败，工作流按草稿版本提交，异步任务随数据环境切换而取消。
 - `app/ui`：Compose 页面、表单、底部弹层、动画和无障碍语义。UI 不直接读写文件或调用 HTTP。
 - `FlowaApplication`：应用级依赖组装，无全局静态页面状态。
 
@@ -38,7 +55,7 @@ APK：`app/build/outputs/apk/debug/app-debug.apk`。不配置 AI 也可以记录
 
 ## 数据与网络
 
-记录、草稿、工作流、对话在应用私有目录的原子快照中持久化；导出时生成与 iOS 兼容的 Markdown。正常数据与演示数据分别存储。API 密钥通过 Android Keystore AES-GCM 加密，应用不启用 Android 自动备份。导出配置按原格式包含明文密钥，导出前会明确提示。
+记录、草稿、工作流、对话在应用私有目录的原子快照中持久化；导出时生成与 iOS 兼容的 Markdown。正常数据与演示数据分别存储。API 密钥通过 Android Keystore AES-GCM 加密，密文与状态在同一个快照内原子写入；旧版独立凭据会自动迁移。应用不启用 Android 自动备份。导出配置按原格式包含明文密钥，导出前会明确提示。
 
 AI 使用用户配置的地址：改写调用 `/chat/completions`，助手调用 `/responses`，模型列表调用 `/models`。默认地址和模型沿用参考项目，不代表开发者提供免费 AI 服务。HTTP 步骤发送 `text/plain`，空草稿向 `/send` 发送回车请求。为了兼容原 Mac 接收端和用户自定义本地服务器，应用允许 HTTP。
 
@@ -50,4 +67,8 @@ AI 使用用户配置的地址：改写调用 `/chat/completions`，助手调用
 
 ## 授权
 
-参考项目采用 GPL-3.0，本移植同样采用根目录 `LICENSE`。原项目的字标、图标和部分文案保留来源，参见 `THIRD_PARTY_LICENSES.md` 与 `NOTICE.md`。
+参考项目 [vibetaking](https://github.com/ddhjy/vibetaking) 采用 GPL-3.0，本移植同样采用根目录 `LICENSE`。原项目的字标、图标和部分文案保留来源，参见 `THIRD_PARTY_LICENSES.md` 与 `NOTICE.md`。
+
+## 开发规范
+
+见 [AGENTS.md](AGENTS.md)。核心要求是先修正错误设计和实现，再继续功能迭代；不依赖重复状态、补偿逻辑或弱化测试掩盖问题。此次重构的边界与验证见 [重构说明](docs/REFACTORING.md)。

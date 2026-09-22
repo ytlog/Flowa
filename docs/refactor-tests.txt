@@ -1,0 +1,41 @@
+Flowa core refactor verification
+Device: Flowa_Test emulator, Android API 36, host GPU.
+Physical phone was not connected for this run.
+
+Unit tests:
+com.flowa.domain.CommandLineTest: 2 tests, 0 failures, 0 errors
+com.flowa.domain.DomainTest: 13 tests, 0 failures, 0 errors
+com.flowa.app.presentation.StateWriterTest: 4 tests, 0 failures, 0 errors
+
+Device suite: 22 cases; initial run passed 21. Clipboard read was blocked by a System UI ANR dialog.
+com.flowa.app.AgentIntegrationTest:....
+com.flowa.app.DefaultWorkflowUiTest:.
+Error in polishCopiesResultWithoutCreatingNote(com.flowa.app.DefaultWorkflowUiTest):
+androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 10000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:431)
+	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
+	at com.flowa.app.DefaultWorkflowUiTest.awaitWindowFocus(DefaultWorkflowUiTest.kt:67)
+	at com.flowa.app.DefaultWorkflowUiTest.polishCopiesResultWithoutCreatingNote(DefaultWorkflowUiTest.kt:130)
+.........
+com.flowa.app.RepositoryTest:.......
+
+Time: 87.341
+There was 1 failure:
+1) polishCopiesResultWithoutCreatingNote(com.flowa.app.DefaultWorkflowUiTest)
+androidx.compose.ui.test.ComposeTimeoutException: Condition still not satisfied after 10000 ms
+	at androidx.compose.ui.test.AndroidComposeUiTestEnvironment$AndroidComposeUiTestImpl.waitUntil(ComposeUiTest.android.kt:431)
+	at androidx.compose.ui.test.junit4.AndroidComposeTestRule.waitUntil(AndroidComposeTestRule.android.kt:306)
+	at com.flowa.app.DefaultWorkflowUiTest.awaitWindowFocus(DefaultWorkflowUiTest.kt:67)
+	at com.flowa.app.DefaultWorkflowUiTest.polishCopiesResultWithoutCreatingNote(DefaultWorkflowUiTest.kt:130)
+
+FAILURES!!!
+Tests run: 22,  Failures: 1
+
+Focused rerun after dismissing the system dialog (no product changes):
+com.flowa.app.DefaultWorkflowUiTest:.
+
+Time: 12.754
+
+OK (1 test)
+
+Final APK and lint build: BUILD SUCCESSFUL.

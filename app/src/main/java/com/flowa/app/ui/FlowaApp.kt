@@ -31,7 +31,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.*
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -80,7 +79,7 @@ import kotlinx.coroutines.delay
     }
     LaunchedEffect(status) { if (status != null) { delay(4000); vm.status.value = null } }
     DevicePermissionDialog(vm)
-    when (sheet) {
+    if (ready) when (sheet) {
         "tags" -> TagSheet(state, vm, emptySet()) { sheet = null }
         "noteTags" -> TagSheet(state, vm, taggedIds) { sheet = null }
         "workflows" -> WorkflowSheet(state, vm) { sheet = null }
@@ -106,7 +105,7 @@ import kotlinx.coroutines.delay
 }
 
 @Composable private fun HomeScreen(state: AppState, vm: AppViewModel, active: Boolean, openLibrary: (String) -> Unit, openSheet: (String) -> Unit, openChat: () -> Unit) {
-    var text by rememberSaveable(stateSaver = TextFieldValue.Saver) { mutableStateOf(TextFieldValue(state.draft.text)) }
+    val text by vm.draftField.collectAsStateWithLifecycle()
     val requester = remember { FocusRequester() }
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -115,9 +114,7 @@ import kotlinx.coroutines.delay
     var focusPicker by remember { mutableStateOf(false) }
     val executing by vm.execution.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
-    val draftReset by vm.draftReset.collectAsStateWithLifecycle()
     val focused = state.workflows.firstOrNull { it.id == state.focusedId && it.isOpen }
-    LaunchedEffect(draftReset) { val saved = vm.state.value.draft.text; if ((vm.draftResetExpectedText == null || text.text == vm.draftResetExpectedText) && text.text != saved) text = TextFieldValue(saved, androidx.compose.ui.text.TextRange(saved.length)) }
     LaunchedEffect(active) { if (active) { delay(250); requester.requestFocus(); keyboard?.show() } else { focusManager.clearFocus(); keyboard?.hide() } }
     fun navigate(action: () -> Unit) { keyboard?.hide(); focusManager.clearFocus(); action() }
     Column(Modifier.fillMaxSize().imePadding()) {
@@ -138,7 +135,7 @@ import kotlinx.coroutines.delay
             }
         }
         Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-            BasicTextField(text, { text = it; vm.draftText(it.text) }, Modifier.widthIn(max = 720.dp).fillMaxSize().padding(horizontal = 20.dp).padding(top = 20.dp).focusRequester(requester), textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface), keyboardOptions = KeyboardOptions(imeAction = if (focused != null) ImeAction.Send else ImeAction.Default), keyboardActions = KeyboardActions(onSend = { focused?.let { vm.run(it, text.text) } }), decorationBox = { inner ->
+            BasicTextField(text, vm::updateDraft, Modifier.widthIn(max = 720.dp).fillMaxSize().padding(horizontal = 20.dp).padding(top = 20.dp).focusRequester(requester), textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface), cursorBrush = SolidColor(MaterialTheme.colorScheme.onSurface), keyboardOptions = KeyboardOptions(imeAction = if (focused != null) ImeAction.Send else ImeAction.Default), keyboardActions = KeyboardActions(onSend = { focused?.let { vm.run(it) } }), decorationBox = { inner ->
                 Box { if (text.text.isEmpty()) Text("写下此刻的想法…", color = Secondary); inner() }
             })
         }
@@ -154,14 +151,14 @@ import kotlinx.coroutines.delay
                 val width by androidx.compose.animation.core.animateDpAsState(if (focused != null) available else compact, spring(dampingRatio = .92f, stiffness = 320f), label = "工作流胶囊展开")
                 Glass(Modifier.width(width).height(48.dp), focused != null) {
                     if (focused != null) {
-                        Row(Modifier.fillMaxWidth().height(48.dp).combinedClickable(enabled = executing == null, onClick = { vm.run(focused, text.text) }, onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); vm.focus(null) }).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().height(48.dp).combinedClickable(enabled = executing == null, onClick = { vm.run(focused) }, onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); vm.focus(null) }).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                             if (executing != null) CircularProgressIndicator(Modifier.size(20.dp), color = androidx.compose.ui.graphics.Color.White, strokeWidth = 2.dp) else Icon(symbol(focused.icon), null, Modifier.size(20.dp))
                             Spacer(Modifier.width(8.dp)); Text(focused.name, maxLines = 1, style = MaterialTheme.typography.titleMedium)
                         }
                     } else Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         GlyphButton(Icons.Outlined.Tune, "工作流设置", executing == null) { openSheet("workflows") }
                         state.workflows.filter { it.isOpen }.forEach { flow ->
-                            Box(Modifier.size(48.dp).combinedClickable(enabled = executing == null, onClickLabel = "运行${flow.name}", onLongClickLabel = "进入专注模式", onClick = { vm.run(flow, text.text) }, onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); vm.focus(flow.id) }), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(48.dp).combinedClickable(enabled = executing == null, onClickLabel = "运行${flow.name}", onLongClickLabel = "进入专注模式", onClick = { vm.run(flow) }, onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); vm.focus(flow.id) }), contentAlignment = Alignment.Center) {
                                 if (executing?.id == flow.id) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp) else Icon(symbol(flow.icon), flow.name, Modifier.size(20.dp))
                             }
                         }

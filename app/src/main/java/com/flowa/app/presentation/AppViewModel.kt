@@ -8,7 +8,8 @@ import com.flowa.app.FlowaApplication
 import com.flowa.data.readBytesLimited
 import com.flowa.domain.*
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.Channel
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.flow.*
 import java.io.File
 
@@ -17,7 +18,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val graph = application as FlowaApplication
     val repository = graph.repository
     val state = repository.state
-    private val _ready = MutableStateFlow(false); val ready = _ready.asStateFlow()
+    private val _ready = MutableStateFlow(false)
+    val ready = _ready.asStateFlow()
     val error = MutableStateFlow<String?>(null)
     val status = MutableStateFlow<String?>(null)
     val execution = MutableStateFlow<Execution?>(null)
@@ -29,64 +31,202 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val chatting = MutableStateFlow(false)
     val devices = graph.discovery.devices
     val permissions = graph.permissions
-    val draftReset = MutableStateFlow(0)
-    var draftResetExpectedText: String? = null
-        private set
-    fun respondPermission(id: String, allowed: Boolean, session: Boolean) { viewModelScope.launch { permissions.respond(id, allowed, session) } }
+    private val _draftField = MutableStateFlow(TextFieldValue())
+    val draftField = _draftField.asStateFlow()
+    private var editorVersion = 0L
+    private var switchingEnvironment = false
+    private var operationJob = SupervisorJob(viewModelScope.coroutineContext[Job])
+    private var operationScope = CoroutineScope(viewModelScope.coroutineContext + operationJob)
     private var chatJob: Job? = null
     private var modelJob: Job? = null
-    private val edits = Channel<suspend () -> Unit>(Channel.UNLIMITED)
-    init {
-        viewModelScope.launch {
-            try { repository.load(); _ready.value = true } catch (e: Exception) { error.value = "记录读取失败：${e.message}。请保留应用数据后重试。" }
-            for (action in edits) try { action() } catch (e: Exception) { error.value = "保存失败：${e.message}" }
+    private val writer = StateWriter(
+        scope = viewModelScope,
+        repository = repository,
+        onLoaded = { state ->
+            replaceEditorText(state.draft.text)
+            _ready.value = true
+        },
+        onLoadFailure = { error.value = "记录读取失败：${it.message}。请保留应用数据后重试。" },
+        onWriteFailure = { error.value = "保存失败：${it.message}" },
+    )
+
+    fun respondPermission(id: String, allowed: Boolean, session: Boolean) {
+        viewModelScope.launch { permissions.respond(id, allowed, session) }
+    }
+
+    fun edit(transform: (AppState) -> AppState) = writer.enqueue(transform)
+    private suspend fun flushEdits() = writer.flush()
+
+    private fun replaceEditorText(text: String) {
+        if (_draftField.value.text != text) {
+            editorVersion++
+            _draftField.value = TextFieldValue(text, TextRange(text.length))
         }
     }
-    fun edit(transform: (AppState) -> AppState) { edits.trySend { repository.update(transform) } }
-    private suspend fun flushEdits() { val done = CompletableDeferred<Unit>(); edits.send { done.complete(Unit) }; done.await() }
-    private fun task(block: suspend () -> Unit) = viewModelScope.launch {
-        try { block() } catch (e: CancellationException) { throw e } catch (e: Exception) { error.value = e.message ?: "操作未完成，请重试。" }
+
+    private fun task(block: suspend () -> Unit) = operationScope.launch { reportFailure(block) }
+
+    private suspend fun reportFailure(block: suspend () -> Unit) {
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            error.value = failure.message ?: "操作未完成，请重试。"
+        }
     }
-    fun draftText(text: String) = edit { it.copy(draft = it.draft.copy(text = text)) }
-    fun draftTags(tags: List<String>) = edit { it.copy(draft = it.draft.copy(tags = tags.distinct()), knownTags = (it.knownTags + tags).distinct()) }
-    fun clearDraft() { task { flushEdits(); repository.update { s -> if (s.draft.text.isEmpty() && s.draft.tags.isEmpty() && s.cleared != null) s.copy(draft = s.cleared!!, cleared = null) else s.copy(cleared = s.draft, draft = Draft()) }; draftResetExpectedText = null; draftReset.value++ } }
+    fun updateDraft(value: TextFieldValue) {
+        if (switchingEnvironment) return
+        val changed = value.text != _draftField.value.text
+        _draftField.value = value
+        if (changed) {
+            editorVersion++
+            edit { it.copy(draft = it.draft.edit(text = value.text)) }
+        }
+    }
+
+    fun draftTags(tags: List<String>) = edit {
+        it.copy(draft = it.draft.edit(tags = tags), knownTags = (it.knownTags + tags).distinct())
+    }
+
+    fun clearDraft() {
+        val version = editorVersion
+        val text = _draftField.value.text
+        val saved = writer.submit { state ->
+            val draft = state.draft.edit(text = text)
+            val cleared = state.cleared
+            if (draft.text.isEmpty() && draft.tags.isEmpty() && cleared != null) {
+                state.copy(draft = draft.restore(cleared), cleared = null)
+            } else {
+                state.copy(cleared = draft, draft = draft.clear())
+            }
+        }
+        task {
+            val next = saved.await()
+            if (editorVersion == version) replaceEditorText(next.draft.text)
+        }
+    }
+
     fun focus(id: String?) = edit { it.copy(focusedId = id) }
-    fun run(workflow: Workflow, text: String) {
-        if (execution.value != null) return
+
+    fun run(workflow: Workflow) {
+        if (execution.value != null || switchingEnvironment) return
         workflow.issue()?.let { error.value = it; return }
+        val version = editorVersion
+        val text = _draftField.value.text
+        // Capture a position in the write queue now, before subsequent keystrokes are enqueued.
+        // Re-persist the editor value so a retry can recover from a previous autosave failure.
+        edit { it.copy(draft = it.draft.edit(text = text)) }
+        val input = writer.snapshot()
         execution.value = Execution(workflow.id)
         task {
             try {
-                flushEdits()
-                val draft = state.value.draft.copy(text = text)
-                status.value = graph.runWorkflow(workflow, draft) { execution.value = Execution(workflow.id, it) }; draftResetExpectedText = draft.text; draftReset.value++
-            } finally { execution.value = null }
+                val draft = input.await().draft
+                val result = graph.runWorkflow(workflow, draft) {
+                    execution.value = Execution(workflow.id, it)
+                }
+                status.value = result.message()
+                if (editorVersion == version) replaceEditorText(state.value.draft.text)
+            } finally {
+                execution.value = null
+            }
         }
     }
-    fun saveWorkflow(workflow: Workflow) = edit { s ->
-        val list = (if (s.workflows.any { it.id == workflow.id }) s.workflows.map { if (it.id == workflow.id) workflow else it } else s.workflows + workflow).toMutableList()
-        if (list.none { it.isOpen }) list[0] = list[0].copy(isOpen = true)
-        s.copy(workflows = list, focusedId = s.focusedId?.takeIf { id -> list.any { it.id == id && it.isOpen } })
+
+    fun saveWorkflow(workflow: Workflow) = edit { state ->
+        val workflows = if (state.workflows.any { it.id == workflow.id }) {
+            state.workflows.map { if (it.id == workflow.id) workflow else it }
+        } else state.workflows + workflow
+        val visible = ensureVisibleWorkflow(workflows)
+        state.copy(
+            workflows = visible,
+            focusedId = state.focusedId?.takeIf { id -> visible.any { it.id == id && it.isOpen } },
+        )
     }
-    fun deleteWorkflow(id: String) = edit { s ->
-        if (s.workflows.size <= 1) s else {
-            val list = s.workflows.filterNot { it.id == id }.toMutableList()
-            if (list.none { it.isOpen }) list[0] = list[0].copy(isOpen = true)
-            s.copy(workflows = list, focusedId = s.focusedId?.takeUnless { it == id })
+
+    fun deleteWorkflow(id: String) = edit { state ->
+        if (state.workflows.size <= 1) state else state.copy(
+            workflows = ensureVisibleWorkflow(state.workflows.filterNot { it.id == id }),
+            focusedId = state.focusedId?.takeUnless { it == id },
+        )
+    }
+
+    private fun ensureVisibleWorkflow(workflows: List<Workflow>): List<Workflow> =
+        if (workflows.any { it.isOpen }) workflows
+        else workflows.mapIndexed { index, workflow -> if (index == 0) workflow.copy(isOpen = true) else workflow }
+
+    fun deleteNotes(ids: Set<String>) = edit { state ->
+        state.copy(notes = state.notes.filterNot { it.id in ids })
+    }
+
+    fun noteTags(ids: Set<String>, add: Set<String>, remove: Set<String>) = edit { state ->
+        state.copy(
+            notes = state.notes.map { note ->
+                if (note.id in ids) note.copy(tags = (note.tags.filterNot { it in remove } + add).distinct())
+                else note
+            },
+            knownTags = (state.knownTags + add).distinct(),
+        )
+    }
+
+    fun renameTag(old: String, new: String) {
+        if (new.isBlank()) return
+        edit { state ->
+            fun rename(tags: List<String>) = tags.map { if (it == old) new.trim() else it }.distinct()
+            state.copy(
+                notes = state.notes.map { it.copy(tags = rename(it.tags)) },
+                draft = state.draft.edit(tags = rename(state.draft.tags)),
+                knownTags = rename(state.knownTags),
+            )
         }
     }
-    fun deleteNotes(ids: Set<String>) = edit { it.copy(notes = it.notes.filterNot { n -> n.id in ids }) }
-    fun noteTags(ids: Set<String>, add: Set<String>, remove: Set<String>) = edit { s -> s.copy(notes = s.notes.map { if (it.id in ids) it.copy(tags = (it.tags.filterNot { t -> t in remove } + add).distinct()) else it }, knownTags = (s.knownTags + add).distinct()) }
-    fun renameTag(old: String, new: String) { if (new.isBlank()) return; edit { s ->
-        fun change(tags: List<String>) = tags.map { if (it == old) new.trim() else it }.distinct()
-        s.copy(notes = s.notes.map { it.copy(tags = change(it.tags)) }, draft = s.draft.copy(tags = change(s.draft.tags)), knownTags = change(s.knownTags))
-    } }
-    fun removeTag(tag: String) = edit { s -> s.copy(notes = s.notes.map { it.copy(tags = it.tags - tag) }, draft = s.draft.copy(tags = s.draft.tags - tag), knownTags = s.knownTags - tag) }
-    fun copy(text: String) { task { graph.device.copy(text); status.value = "已复制文本" } }
-    fun setDemo(enabled: Boolean) { task { flushEdits(); stopChat(); repository.setDemo(enabled); chatId.value = null; draftResetExpectedText = null; draftReset.value++ } }
+
+    fun removeTag(tag: String) = edit { state ->
+        state.copy(
+            notes = state.notes.map { it.copy(tags = it.tags - tag) },
+            draft = state.draft.edit(tags = state.draft.tags - tag),
+            knownTags = state.knownTags - tag,
+        )
+    }
+
+    fun copy(text: String) {
+        task {
+            graph.device.copy(text)
+            status.value = "已复制文本"
+        }
+    }
+
+    fun setDemo(enabled: Boolean) {
+        if (switchingEnvironment || state.value.demoMode == enabled) return
+        switchingEnvironment = true
+        _ready.value = false
+        viewModelScope.launch {
+            try {
+                reportFailure {
+                    // Every asynchronous operation belongs to the environment where it started.
+                    operationJob.cancelAndJoin()
+                    flushEdits()
+                    repository.setDemo(enabled)
+                    chatId.value = null
+                    streaming.value = ""
+                    toolActivity.value = emptyList()
+                    status.value = null
+                    replaceEditorText(state.value.draft.text)
+                }
+            } finally {
+                operationJob = SupervisorJob(viewModelScope.coroutineContext[Job])
+                operationScope = CoroutineScope(viewModelScope.coroutineContext + operationJob)
+                switchingEnvironment = false
+                _ready.value = true
+            }
+        }
+    }
+
     fun settings(settings: AiSettings) {
         if (settings.baseUrl != state.value.settings.baseUrl || settings.apiKey != state.value.settings.apiKey) {
-            modelJob?.cancel(); loadingModels.value = false; models.value = emptyList()
+            modelJob?.cancel()
+            loadingModels.value = false
+            models.value = emptyList()
         }
         edit { it.copy(settings = settings) }
     }
@@ -98,23 +238,51 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun newChat() { if (!chatting.value) { chatId.value = null; streaming.value = ""; toolActivity.value = emptyList() } }
     fun selectChat(id: String) { if (!chatting.value) { chatId.value = id; streaming.value = ""; toolActivity.value = emptyList() } }
     fun deleteChat(id: String) { if (chatId.value == id) newChat(); edit { it.copy(sessions = it.sessions.filterNot { s -> s.id == id }) } }
-    fun send(text: String): Boolean {
-        if (text.isBlank() || chatting.value) return false
-        if (state.value.settings.apiKey.isBlank()) { error.value = "请先在设置中填写 AI 密钥。输入内容已保留。"; return false }
-        val session = state.value.sessions.firstOrNull { it.id == chatId.value } ?: ChatSession(title = text.take(24))
+    fun send(text: String, onPersisted: () -> Unit): Boolean {
+        if (text.isBlank() || chatting.value || switchingEnvironment) return false
+        if (state.value.settings.apiKey.isBlank()) {
+            error.value = "请先在设置中填写 AI 密钥。输入内容已保留。"
+            return false
+        }
+        val session = state.value.sessions.firstOrNull { it.id == chatId.value }
+            ?: ChatSession(title = text.take(24))
         val messages = session.messages + Message(role = "user", text = text)
         val id = session.id
-        chatId.value = id; chatting.value = true; streaming.value = ""; toolActivity.value = emptyList()
+        chatId.value = id
+        chatting.value = true
+        streaming.value = ""
+        toolActivity.value = emptyList()
         chatJob = task {
-            repository.update { it.copy(sessions = listOf(session.copy(messages = messages, updatedAt = System.currentTimeMillis())) + it.sessions.filterNot { s -> s.id == id }) }
             try {
-                val result = graph.ai.agent(state.value.settings, messages, { streaming.value = it }, { toolActivity.value = toolActivity.value + it }, id)
-                repository.update { it.copy(sessions = it.sessions.map { s -> if (s.id == id) s.copy(messages = messages + Message(role = "assistant", text = result, tools = toolActivity.value)) else s }) }
+                flushEdits()
+                repository.update { state ->
+                    state.copy(sessions = listOf(session.copy(messages = messages, updatedAt = System.currentTimeMillis())) +
+                        state.sessions.filterNot { it.id == id })
+                }
+                onPersisted()
+                val updates = CoroutineScope(currentCoroutineContext())
+                val result = graph.ai.agent(
+                    settings = state.value.settings,
+                    messages = messages,
+                    onDelta = { partial -> updates.launch { streaming.value = partial } },
+                    onTool = { title -> updates.launch { toolActivity.value = toolActivity.value + title } },
+                    sessionId = id,
+                )
+                repository.update { state ->
+                    state.copy(sessions = state.sessions.map { current ->
+                        if (current.id == id) current.copy(messages = messages +
+                            Message(role = "assistant", text = result, tools = toolActivity.value))
+                        else current
+                    })
+                }
                 streaming.value = ""
-            } finally { chatting.value = false }
+            } finally {
+                chatting.value = false
+            }
         }
         return true
     }
+
     fun stopChat() { chatJob?.cancel(); status.value = "已停止生成" }
     fun recommendTags(text: String, onResult: (List<String>) -> Unit) { task {
         val available = state.value.tags

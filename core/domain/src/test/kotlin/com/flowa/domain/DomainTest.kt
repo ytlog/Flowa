@@ -33,6 +33,38 @@ class DomainTest {
             assertTrue(repo.state.value.notes.isEmpty()); assertTrue(device.copies.isEmpty())
         }
     }
+    @Test fun returningToTheSameTextIsStillANewDraft() = runTest {
+        val repo = FakeRepository()
+        val original = repo.state.value.draft
+        RunWorkflow(repo, FakeAi(), FakeDevice())(
+            Workflow(steps = listOf(Step(type = StepType.SAVE))), original,
+        ) {
+            repo.state.value = repo.state.value.copy(draft = original.edit(text = "改过的内容").edit(text = original.text))
+        }
+        assertEquals(original.text, repo.state.value.draft.text)
+        assertEquals(2L, repo.state.value.draft.revision)
+        assertEquals(original.text, repo.state.value.notes.single().text)
+    }
+
+    @Test fun settingsRemainConsistentWithinOneWorkflow() = runTest {
+        val repo = FakeRepository()
+        repo.state.value = repo.state.value.copy(settings = AiSettings(model = "initial"))
+        val usedModels = mutableListOf<String>()
+        val ai = object : AiGateway {
+            override suspend fun complete(settings: AiSettings, messages: List<Message>, onDelta: (String) -> Unit): String {
+                usedModels.add(settings.model)
+                repo.state.value = repo.state.value.copy(settings = AiSettings(model = "changed"))
+                return "结果"
+            }
+            override suspend fun agent(settings: AiSettings, messages: List<Message>, onDelta: (String) -> Unit, onTool: (String) -> Unit, sessionId: String) = "结果"
+            override suspend fun models(settings: AiSettings) = emptyList<String>()
+        }
+        RunWorkflow(repo, ai, FakeDevice())(Workflow(steps = listOf(
+            Step(type = StepType.AI, prompt = "第一步"), Step(type = StepType.AI, prompt = "第二步"),
+        )), repo.state.value.draft) {}
+        assertEquals(listOf("initial", "initial"), usedModels)
+    }
+
     @Test fun searchRequiresEveryKeywordAndEveryIncludedTag() {
         val note = Note(text = "今天讨论 Compose 动画", tags = listOf("工作", "灵感"))
         assertTrue(NoteFilter("compose 动画", setOf("工作")).matches(note))
@@ -59,7 +91,7 @@ class DomainTest {
         val device = FakeDevice()
         RunWorkflow(repo, FakeAi(), device)(Workflow(steps = listOf(Step(type = StepType.SAVE), Step(type = StepType.AI, prompt = "改写"), Step(type = StepType.COPY))), repo.state.value.draft) {}
         assertEquals("改写结果", repo.state.value.notes.single().text); assertEquals(listOf("工作"), repo.state.value.notes.single().tags)
-        assertEquals(listOf("改写结果"), device.copies); assertEquals(Draft(tags = listOf("工作")), repo.state.value.draft)
+        assertEquals(listOf("改写结果"), device.copies); assertEquals(Draft(tags = listOf("工作"), revision = 1), repo.state.value.draft)
     }
     @Test fun failureDoesNotConsumeDraftOrCreateRecord() = runTest {
         val repo = FakeRepository(); val device = FakeDevice(fail = true)

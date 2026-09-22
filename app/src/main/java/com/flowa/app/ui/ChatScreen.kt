@@ -28,6 +28,13 @@ import com.flowa.domain.*
     val busy by vm.chatting.collectAsStateWithLifecycle()
     val messages = state.sessions.firstOrNull { it.id == id }?.messages.orEmpty()
     var input by rememberSaveable { mutableStateOf("") }
+    var inputVersion by rememberSaveable { mutableLongStateOf(0L) }
+    fun updateInput(value: String) {
+        if (input != value) {
+            input = value
+            inputVersion++
+        }
+    }
     val list = rememberLazyListState()
     var follow by remember { mutableStateOf(true) }
     LaunchedEffect(list) { snapshotFlow { list.isScrollInProgress to list.canScrollForward }.collect { (scrolling, canForward) -> if (scrolling) follow = !canForward } }
@@ -39,7 +46,7 @@ import com.flowa.domain.*
         }
         if (messages.isEmpty() && !busy) Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             EmptyState(Icons.Outlined.AutoAwesome, "和记录聊一聊", "查找、整理和回顾你的想法，也可以把重复的任务交给助手。")
-            listOf("帮我回顾最近的记录", "整理还没有标签的记录", "总结本周的想法").forEach { suggestion -> OutlinedButton(onClick = { input = suggestion }, shape = RoundedCornerShape(14.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) { Text(suggestion) } }
+            listOf("帮我回顾最近的记录", "整理还没有标签的记录", "总结本周的想法").forEach { suggestion -> OutlinedButton(onClick = { updateInput(suggestion) }, shape = RoundedCornerShape(14.dp), modifier = Modifier.padding(horizontal = 24.dp, vertical = 4.dp)) { Text(suggestion) } }
         } else LazyColumn(Modifier.weight(1f).widthIn(max = 720.dp).fillMaxWidth().align(Alignment.CenterHorizontally), state = list, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(24.dp)) {
             items(messages, key = { it.id }) { message -> MessageBubble(message) }
             if (busy || streaming.isNotEmpty()) item(key = "streaming") { Column {
@@ -50,9 +57,17 @@ import com.flowa.domain.*
             item(key = "bottom") { Spacer(Modifier.height(4.dp)) }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.Bottom) {
-            OutlinedTextField(input, { input = it }, Modifier.weight(1f), placeholder = { Text("给 AI 助手发送消息…", style = MaterialTheme.typography.bodyMedium) }, shape = RoundedCornerShape(24.dp), maxLines = 6, colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
+            OutlinedTextField(input, ::updateInput, Modifier.weight(1f), placeholder = { Text("给 AI 助手发送消息…", style = MaterialTheme.typography.bodyMedium) }, shape = RoundedCornerShape(24.dp), maxLines = 6, colors = OutlinedTextFieldDefaults.colors(unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant))
             Spacer(Modifier.width(8.dp))
-            FilledIconButton(onClick = { if (busy) vm.stopChat() else if (vm.send(input)) { input = ""; follow = true } }, enabled = busy || input.isNotBlank(), modifier = Modifier.padding(bottom = 4.dp).size(48.dp)) { Icon(if (busy) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward, if (busy) "停止生成" else "发送消息") }
+            FilledIconButton(onClick = {
+                if (busy) vm.stopChat() else {
+                    val submittedVersion = inputVersion
+                    vm.send(input) {
+                        if (inputVersion == submittedVersion) updateInput("")
+                        follow = true
+                    }
+                }
+            }, enabled = busy || input.isNotBlank(), modifier = Modifier.padding(bottom = 4.dp).size(48.dp)) { Icon(if (busy) Icons.Outlined.Stop else Icons.Outlined.ArrowUpward, if (busy) "停止生成" else "发送消息") }
         }
     }
 }

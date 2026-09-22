@@ -16,14 +16,4 @@ object DefaultWorkflows {
         ))
     )
 
-    fun upgrade(existing: List<Workflow>): List<Workflow> {
-        val defaults = create()
-        val retained = existing.map { flow ->
-            if (flow.name == "默认工作流" && (flow.steps.isEmpty() ||
-                    (flow.steps.size == 1 && flow.steps.single().type == StepType.SAVE && flow.steps.single().enabled)))
-                defaults.first().copy(id = flow.id, isOpen = flow.isOpen)
-            else flow
-        }
-        return retained + defaults.filter { preset -> retained.none { it.id == preset.id || it.name == preset.name } }
-    }
 }
