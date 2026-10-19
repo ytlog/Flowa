@@ -10,8 +10,6 @@
   <img src="docs/images/app-store/tags.jpg" alt="通过标签整理零散想法" width="32%" />
 </p>
 
-产品图来自 [iOS 版 App Store 页面](https://apps.apple.com/cn/app/%E9%9A%8F%E5%BF%83%E8%AE%B0-%E6%89%93%E5%BC%80%E5%8D%B3%E5%86%99/id6778762693)。
-
 ## 打开，就开始记录
 
 随心记把入口放在一张空白页：光标和键盘就绪，不用先新建笔记、选择分类或填写标题。随手记下念头、口述、待办或一段还没想清楚的话，草稿会自动保存在本机。
