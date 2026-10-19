@@ -2,7 +2,15 @@
 
 打开即写的纯文本速记工具。接住一闪而过的想法，再用标签、搜索和工作流慢慢整理。
 
-[下载 Android 版](https://github.com/ytlog/Flowa/releases/latest) · [查看版本记录](https://github.com/ytlog/Flowa/releases) · [iOS 版 App Store](https://apps.apple.com/cn/app/id6778762693) · [iOS 源码](https://github.com/ddhjy/vibetaking)
+[下载 Android 版](https://github.com/ytlog/Flowa/releases/latest) · [查看版本记录](https://github.com/ytlog/Flowa/releases) · [iOS 版 App Store](https://apps.apple.com/cn/app/%E9%9A%8F%E5%BF%83%E8%AE%B0-%E6%89%93%E5%BC%80%E5%8D%B3%E5%86%99/id6778762693) · [iOS 源码](https://github.com/ddhjy/vibetaking)
+
+<p align="center">
+  <img src="docs/images/app-store/quick-capture.jpg" alt="打开即写，随时接住灵感" width="32%" />
+  <img src="docs/images/app-store/search-and-review.jpg" alt="搜索内容和标签，找回记录" width="32%" />
+  <img src="docs/images/app-store/tags.jpg" alt="通过标签整理零散想法" width="32%" />
+</p>
+
+产品图来自 [iOS 版 App Store 页面](https://apps.apple.com/cn/app/%E9%9A%8F%E5%BF%83%E8%AE%B0-%E6%89%93%E5%BC%80%E5%8D%B3%E5%86%99/id6778762693)。
 
 ## 打开，就开始记录
 
@@ -48,19 +56,11 @@ AI 请求失败时保留原稿；处理期间继续输入，新的草稿也会�
 
 导出的配置文件包含明文 AI 密钥，请妥善保管，仅分享给信任的设备。
 
-## 界面预览
-
-| 随手记录 | 专注模式 | 记录列表 |
-| --- | --- | --- |
-| <img src="docs/screenshots/home.png" alt="随心记首页" width="240" /> | <img src="docs/screenshots/focus.png" alt="专注模式" width="240" /> | <img src="docs/screenshots/library.png" alt="记录列表" width="240" /> |
-
-[深色模式](docs/screenshots/home-dark.png) · [工作流设置](docs/screenshots/workflow.png)
-
 ## 下载与安装
 
 Android 版支持 **Android 8.0 及以上**。前往 [GitHub Releases](https://github.com/ytlog/Flowa/releases/latest) 下载 `.apk` 文件，在设备上打开并按系统提示安装；后续版本可使用相同发布签名覆盖升级。
 
-iOS 用户可前往 [App Store 下载 iOS 版](https://apps.apple.com/cn/app/id6778762693)。
+iOS 用户可前往 [App Store 下载 iOS 版](https://apps.apple.com/cn/app/%E9%9A%8F%E5%BF%83%E8%AE%B0-%E6%89%93%E5%BC%80%E5%8D%B3%E5%86%99/id6778762693)。
 
 ## 开源与反馈
 

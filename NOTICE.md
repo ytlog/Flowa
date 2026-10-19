@@ -11,3 +11,5 @@ Flowa Android is a derivative Android port of the local `vibetaking` project.
 - The upstream third-party attribution document is retained verbatim in `THIRD_PARTY_LICENSES.md`; it describes upstream dependencies, not an assertion that those Swift libraries are linked into this Android build.
 
 Android dependencies include AndroidX / Jetpack Compose (Apache-2.0), Kotlin and kotlinx.coroutines (Apache-2.0), and OkHttp / Okio (Apache-2.0).
+
+Product promotional images in `docs/images/app-store/` are from the [iOS App Store product page](https://apps.apple.com/cn/app/%E9%9A%8F%E5%BF%83%E8%AE%B0-%E6%89%93%E5%BC%80%E5%8D%B3%E5%86%99/id6778762693), reused here for the product introduction.
