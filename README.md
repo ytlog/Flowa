@@ -1,74 +1,69 @@
-# 随心记 · Flowa Android
+# 随心记 · Flowa
 
-打开即写的纯文本速记工具，参考 [vibetaking](https://github.com/ddhjy/vibetaking) 的 `apps/ios` 源码实现的 Android 客户端。界面使用 Jetpack Compose，保留原宋体字标、黑白控件、靛蓝标签、工作流胶囊和专注模式。
+打开即写的纯文本速记工具。接住一闪而过的想法，再用标签、搜索和工作流慢慢整理。
 
-启动直达空白编辑页：自动聚焦、键盘就绪、草稿实时落盘，记录以 Markdown 导入导出。Android 无法访问原应用的 iCloud 私有容器，本版使用本机持久化。
+[下载 Android 版](https://github.com/ytlog/Flowa/releases/latest) · [查看版本记录](https://github.com/ytlog/Flowa/releases) · [iOS 版 App Store](https://apps.apple.com/cn/app/id6778762693) · [iOS 源码](https://github.com/ddhjy/vibetaking)
 
-## 设计理念
+## 打开，就开始记录
 
-多数笔记产品打开先看列表，以回顾为中心。随心记把入口放回记录本身：一张空白页，一个就绪的光标。空白减少选择和干扰，也自然产生把它填上的动机。
+随心记把入口放在一张空白页：光标和键盘就绪，不用先新建笔记、选择分类或填写标题。随手记下念头、口述、待办或一段还没想清楚的话，草稿会自动保存在本机。
 
-这种快来自几处取舍：
+- **轻松输入**：纯文本书写，配合系统听写或语音转文字工具快速记录。
+- **随时续写**：草稿自动保存，支持清除与恢复。
+- **保持专注**：长按工作流进入专注模式，减少界面干扰。
+- **舒适阅读**：宋体字标、简洁配色，支持浅色、深色和系统字体缩放。
 
-- **入口快**：主页即编辑页，无需新建、选分类或找笔记。
-- **启动快**：原生组件构建，优先保证启动和交互响应。
-- **输入快**：纯文本，不区分标题正文，不提供复杂排版。
-- **整理快**：只有记录和标签两层；标签积累后，零散文本可分类、可检索、可回顾。
+## 让文字顺着你的习惯流动
 
-需要更快输入时，配合系统听写或语音转文字工具即可。
+内置三个常用工作流：
 
-参考：[vibetaking](https://github.com/ddhjy/vibetaking) · [App Store](https://apps.apple.com/cn/app/id6778762693)
+| 工作流 | 用途 | 是否需要 AI |
+| --- | --- | --- |
+| 保存记录 | 将当前文字和标签存为记录 | 否 |
+| 整理口述 | 整理口语表达后保存 | 是 |
+| 润色文案 | 润色文字并复制，方便粘贴到其他应用 | 是 |
 
-## 运行
+也可以创建自己的工作流，自由组合 AI 改写、AI 助手、复制、保存和 HTTP 发送步骤，调整顺序、复制或隐藏不常用的流程。
 
-使用 Android Studio 打开本目录，选择 `app`，运行到 Android 8.0（API 26）及以上设备。需要 JDK 17、Android SDK 35。`local.properties` 按本机 SDK 路径配置。
+AI 请求失败时保留原稿；处理期间继续输入，新的草稿也会保留。
 
-```sh
-./gradlew :app:assembleDebug
-./gradlew :core:domain:test :app:testDebugUnitTest
-./gradlew :app:connectedDebugAndroidTest -PisolatedUiTest=true
-./gradlew :app:lintDebug
-```
+## 记得下来，也找得回来
 
-UI 自动化使用 `-PisolatedUiTest=true` 安装独立包 `com.flowa.app.uitest`，避免测试操作影响日常笔记。测试完成后，不带此参数重新构建正式调试 APK。
+- 用标签组织记录，按关键词搜索，组合包含或排除标签筛选。
+- 查看无标签记录，批量选择和调整标签。
+- 随机回顾旧记录，通过统计日历查看记录习惯。
+- 展开、复制已有文字，把零散想法继续用起来。
 
-APK：`app/build/outputs/apk/debug/app-debug.apk`。不配置 AI 也可以记录、搜索、导入导出以及使用保存、复制工作流。默认提供三个工作流：保存记录（直接保存）、整理口述（AI 整理后保存）、润色文案（AI 润色后复制）。后两个需要先在设置中配置 AI。升级旧版本时替换原始空工作流并补齐预设，保留自定义工作流、记录和草稿；之后删除的预设不会重新出现。
+## 随时与 AI 讨论
 
-## 分层
+在设置中连接自己的 AI 服务，填写服务地址、密钥和模型，即可使用整理、润色和 AI 助手。助手支持流式回复、停止生成、历史对话，以及保存在本机的记忆和技能。
 
-- `core/domain`：纯 Kotlin 模型、仓库/服务接口、搜索规则、Markdown 编解码、工作流执行用例。没有 Android 和 Compose 依赖。
-- `core/data`：仓库协调状态；`SnapshotStore` 原子存储、`SnapshotMigrations` 升级旧快照、`NoteArchive` 导入导出笔记、`ConfigurationCodec` 兼容 iOS 配置。平台接口实现网络、Keystore、局域网发现与设备授权。
-- `app/presentation`：ViewModel 统一持有编辑器状态；`StateWriter` 顺序保存并传递失败，工作流按草稿版本提交，异步任务随数据环境切换而取消。
-- `app/ui`：Compose 页面、表单、底部弹层、动画和无障碍语义。UI 不直接读写文件或调用 HTTP。
-- `FlowaApplication`：应用级依赖组装，无全局静态页面状态。
+普通记录、搜索、导入导出，以及保存和复制工作流均可在不配置 AI 的情况下使用。AI 功能使用你配置的服务，相关文本会发送到该服务。
 
-## 功能
+## 你的记录，保存在你的设备
 
-- 草稿自动保存、清除/恢复、标签保留，打开自动弹出键盘。
-- 多工作流入口、长按专注、胶囊宽度弹簧动画、固定位置的标签/退出与清除控件。
-- 工作流新建、复制、隐藏、删除、步骤排序和启停；AI 改写、AI 助手、复制、保存、HTTP 发送五种步骤。
-- 全文 AND 搜索、包含/排除标签、无标签、随机回顾、记录展开与复制、侧滑标签/删除、批量选择与标签、统计日历。
-- Markdown/ZIP 导入、去重、ZIP 导出；iOS schemaVersion 1 配置导入导出。
-- AI 模型列表/手动模型、流式回复、停止生成、历史对话、工具活动展开、笔记工具、记忆与技能。
-- 日历/剪贴板设备授权；本机提醒事项和通知；“本次会话允许”按实际对话隔离。
-- 独立演示数据、浅深色、系统字体缩放、系统动画缩放。
+记录、草稿、工作流和对话保存在本机，AI 密钥加密存储。演示模式使用独立的示例数据，方便试用功能。
 
-## 数据与网络
+支持 Markdown / ZIP 导入导出，可与 iOS 版交换记录，也可导入导出工作流和 AI 配置。Android 版目前使用本机存储，不支持 iCloud 自动同步，请按需导出备份。
 
-记录、草稿、工作流、对话在应用私有目录的原子快照中持久化；导出时生成与 iOS 兼容的 Markdown。正常数据与演示数据分别存储。API 密钥通过 Android Keystore AES-GCM 加密，密文与状态在同一个快照内原子写入；旧版独立凭据会自动迁移。应用不启用 Android 自动备份。导出配置按原格式包含明文密钥，导出前会明确提示。
+导出的配置文件包含明文 AI 密钥，请妥善保管，仅分享给信任的设备。
 
-AI 使用用户配置的地址：改写调用 `/chat/completions`，助手调用 `/responses`，模型列表调用 `/models`。默认地址和模型沿用参考项目，不代表开发者提供免费 AI 服务。HTTP 步骤发送 `text/plain`，空草稿向 `/send` 发送回车请求。为了兼容原 Mac 接收端和用户自定义本地服务器，应用允许 HTTP。
+## 界面预览
 
-## 平台适配和验证
+| 随手记录 | 专注模式 | 记录列表 |
+| --- | --- | --- |
+| <img src="docs/screenshots/home.png" alt="随心记首页" width="240" /> | <img src="docs/screenshots/focus.png" alt="专注模式" width="240" /> | <img src="docs/screenshots/library.png" alt="记录列表" width="240" /> |
 
-实际截图：[首页](docs/screenshots/home.png)、[专注模式](docs/screenshots/focus.png)、[深色](docs/screenshots/home-dark.png)。
+[深色模式](docs/screenshots/home-dark.png) · [工作流设置](docs/screenshots/workflow.png)
 
-见 [移植对照](docs/PORTING.md) 与 [验证记录](docs/VALIDATION.md)。本工程不宣称 Apple 系统控件和 Android 达到像素级、系统行为级完全一致。
+## 下载与安装
 
-## 授权
+Android 版支持 **Android 8.0 及以上**。前往 [GitHub Releases](https://github.com/ytlog/Flowa/releases/latest) 下载 `.apk` 文件，在设备上打开并按系统提示安装；后续版本可使用相同发布签名覆盖升级。
 
-参考项目 [vibetaking](https://github.com/ddhjy/vibetaking) 采用 GPL-3.0，本移植同样采用根目录 `LICENSE`。原项目的字标、图标和部分文案保留来源，参见 `THIRD_PARTY_LICENSES.md` 与 `NOTICE.md`。
+iOS 用户可前往 [App Store 下载 iOS 版](https://apps.apple.com/cn/app/id6778762693)。
 
-## 开发规范
+## 开源与反馈
 
-见 [AGENTS.md](AGENTS.md)。核心要求是先修正错误设计和实现，再继续功能迭代；不依赖重复状态、补偿逻辑或弱化测试掩盖问题。此次重构的边界与验证见 [重构说明](docs/REFACTORING.md)。
+遇到问题或有功能建议，欢迎提交 [Issue](https://github.com/ytlog/Flowa/issues)。参与开发请查看 [开发文档](docs/DEVELOPMENT.md)，构建和发布流程见 [发布文档](docs/RELEASING.md)。
+
+本项目采用 [GPL-3.0](LICENSE)。字标、图标和部分文案的来源说明见 [NOTICE](NOTICE.md) 与 [第三方许可](THIRD_PARTY_LICENSES.md)。
