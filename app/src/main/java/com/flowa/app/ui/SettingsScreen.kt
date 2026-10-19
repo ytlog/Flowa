@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.flowa.app.BuildConfig
 import com.flowa.app.presentation.AppViewModel
 import com.flowa.domain.*
 import com.flowa.data.DeviceCapability
@@ -53,7 +54,7 @@ import com.flowa.data.PermissionMode
                     TextButton(onClick = { vm.edit { it.copy(memory = memory) }; subpage = null }) { Text("保存记忆") }
                 }
                 "debug" -> FormSection("本机状态") {
-                    FormRow("记录", state.notes.size.toString()); Separator(); FormRow("工作流", state.workflows.size.toString()); Separator(); FormRow("对话", state.sessions.size.toString()); Separator(); FormRow("数据状态", "本机原子写入 · API 密钥由 Android Keystore 加密"); Separator(); FormRow("版本", "Flowa Android 1.0.0")
+                    FormRow("记录", state.notes.size.toString()); Separator(); FormRow("工作流", state.workflows.size.toString()); Separator(); FormRow("对话", state.sessions.size.toString()); Separator(); FormRow("数据状态", "本机原子写入 · API 密钥由 Android Keystore 加密"); Separator(); FormRow("版本", "Flowa Android ${BuildConfig.VERSION_NAME}")
                 }
                 else -> {
                     FormSection("连接 AI 服务", "密钥加密保存在本机，使用 AI 时相关文本会发送到你设置的服务。普通记录无需配置 AI。") {

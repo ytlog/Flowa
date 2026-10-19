@@ -4,3 +4,9 @@
 local.properties
 *.iml
 .DS_Store
+*.jks
+*.keystore
+*.p12
+keystore.properties
+signing.properties
+/dist/

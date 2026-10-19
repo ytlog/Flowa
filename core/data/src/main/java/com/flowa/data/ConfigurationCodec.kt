@@ -13,7 +13,7 @@ internal object ConfigurationCodec {
     fun encode(state: AppState): String = JSONObject()
         .put("schemaVersion", 1)
         .put("exportedAt", Instant.now().truncatedTo(ChronoUnit.SECONDS).toString())
-        .put("appVersion", "1.0.0-android")
+        .put("appVersion", BuildConfig.APP_VERSION)
         .put("ai", JsonCodec.settings(state.settings, true))
         .put("workflows", JSONObject()
             .put("selectedWorkflowId", state.workflows.firstOrNull()?.id)

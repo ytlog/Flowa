@@ -1,7 +1,11 @@
 plugins { id("com.android.library"); kotlin("android") }
 android {
     namespace = "com.flowa.data"; compileSdk = 35
-    defaultConfig { minSdk = 26 }
+    defaultConfig {
+        minSdk = 26
+        buildConfigField("String", "APP_VERSION", "\"${providers.gradleProperty("flowa.versionName").get()}-android\"")
+    }
+    buildFeatures { buildConfig = true }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
 }
